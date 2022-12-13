@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "vite serve",
-    "build": "vite build --emptyOutDir --base=/liquid-geo/dist/",
+    "build": "vite build --emptyOutDir --base=/frost/dist/",
     "preview": "vite preview"
   },
   "devDependencies": {
