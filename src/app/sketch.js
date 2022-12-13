@@ -10,6 +10,12 @@ import textureVert from './shader/texture.vert.glsl';
 import textureFrag from './shader/texture.frag.glsl';
 import testVert from './shader/test.vert.glsl';
 import testFrag from './shader/test.frag.glsl';
+import highpassVert from './shader/highpass.vert.glsl';
+import highpassFrag from './shader/highpass.frag.glsl';
+import blurVert from './shader/blur.vert.glsl';
+import blurFrag from './shader/blur.frag.glsl';
+import compositeVert from './shader/composite.vert.glsl';
+import compositeFrag from './shader/composite.frag.glsl';
 
 export class Sketch {
 
@@ -20,6 +26,9 @@ export class Sketch {
     // relative frames according to the target frame duration (1 = 60 fps)
     // gets smaller with higher framerates --> use to adapt animation timing
     #deltaFrames = 0;
+    
+    // the scale factor for the bloom and lensflare highpass texture
+    SS_FX_SCALE = 0.4;
 
     camera = {
         matrix: mat4.create(),
@@ -81,6 +90,20 @@ export class Sketch {
 
         if (needsResize) {
             gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+
+            if (this.highpassFBO) {
+                twgl.resizeFramebufferInfo(gl, this.highpassFBO, [{attachmentPoint: gl.COLOR_ATTACHMENT0}], 
+                    this.viewportSize[0] * this.SS_FX_SCALE, this.viewportSize[1] * this.SS_FX_SCALE);
+            }
+
+            if (this.blurFBO) {
+                twgl.resizeFramebufferInfo(gl, this.blurFBO, [{attachmentPoint: gl.COLOR_ATTACHMENT0}], 
+                    this.viewportSize[0] * this.SS_FX_SCALE, this.viewportSize[1] * this.SS_FX_SCALE);
+            }
+
+            if (this.drawFBO) {
+                twgl.resizeFramebufferInfo(gl, this.drawFBO, [{attachmentPoint: gl.COLOR_ATTACHMENT0}], this.viewportSize[0], this.viewportSize[1]);
+            }
         }
 
         this.#updateProjectionMatrix(gl);
@@ -101,10 +124,15 @@ export class Sketch {
             this.canvas.clientHeight
         );
 
+        await this.#initDirtMap();
+
         // Setup Programs
         this.colorPrg = twgl.createProgramInfo(gl, [colorVert, colorFrag]);
         this.texturePrg = twgl.createProgramInfo(gl, [textureVert, textureFrag]);
         this.testPrg = twgl.createProgramInfo(gl, [testVert, testFrag]);
+        this.highpassPrg = twgl.createProgramInfo(gl, [highpassVert, highpassFrag]);
+        this.blurPrg = twgl.createProgramInfo(gl, [blurVert, blurFrag]);
+        this.compositePrg = twgl.createProgramInfo(gl, [compositeVert, compositeFrag]);
 
         // Setup Meshes
         this.quadBufferInfo = twgl.createBufferInfoFromArrays(gl, { a_position: { numComponents: 2, data: [-1, -1, 3, -1, -1, 3] }});
@@ -133,6 +161,22 @@ export class Sketch {
         );
         this.iceTexture = this.textureFBO.attachments[0];
         this.iceNormal = this.textureFBO.attachments[1];
+        this.drawFBO = twgl.createFramebufferInfo(gl, [{attachmentPoint: gl.COLOR_ATTACHMENT0}], this.viewportSize[0], this.viewportSize[1]);
+        this.colorTexture = this.drawFBO.attachments[0];
+        this.highpassFBO = twgl.createFramebufferInfo(
+            gl, 
+            [{attachmentPoint: gl.COLOR_ATTACHMENT0}], 
+            this.viewportSize[0] * this.SS_FX_SCALE,
+            this.viewportSize[1] * this.SS_FX_SCALE
+        );
+        this.highpassTexture = this.highpassFBO.attachments[0];
+        this.blurFBO = twgl.createFramebufferInfo(
+            gl, 
+            [{attachmentPoint: gl.COLOR_ATTACHMENT0}], 
+            this.viewportSize[0] * this.SS_FX_SCALE,
+            this.viewportSize[1] * this.SS_FX_SCALE
+        );
+        this.blurTexture = this.blurFBO.attachments[0];
 
         this.worldMatrix = mat4.create();
         this.worldInverseTransposeMatrix = mat4.create();
@@ -143,6 +187,17 @@ export class Sketch {
         this.#updateProjectionMatrix(gl);
 
         this.resize();
+    }
+
+    #initDirtMap() {
+        /** @type {WebGLRenderingContext} */
+        const gl = this.gl;
+
+        return new Promise((resolve) => {
+            this.dirtTexture = twgl.createTexture(gl, {
+                src: new URL('../assets/dirt.jpg', import.meta.url).toString(),
+            }, () => resolve());
+        });
     }
 
     #initTweakpane() {
@@ -176,7 +231,7 @@ export class Sketch {
         }
 
 
-        twgl.bindFramebufferInfo(gl, null);
+        twgl.bindFramebufferInfo(gl, this.drawFBO);
         gl.enable(gl.CULL_FACE);
         gl.enable(gl.DEPTH_TEST);
         this.gl.clearColor(0, 0, 0, 1);
@@ -190,7 +245,8 @@ export class Sketch {
             u_cameraPos: this.camera.position,
             u_time: this.#time,
             u_iceTexture: this.iceTexture,
-            u_iceNormal: this.iceNormal
+            u_iceNormal: this.iceNormal,
+            u_dirtTexture: this.dirtTexture
         });
         gl.bindVertexArray(this.modelVAO);
         gl.drawElements(
@@ -200,17 +256,47 @@ export class Sketch {
             0
         );
 
+        // get highpass
+        twgl.bindFramebufferInfo(gl, this.highpassFBO);
+        gl.bindVertexArray(this.quadVAO);
+        gl.useProgram(this.highpassPrg.program);
+        twgl.setUniforms(this.highpassPrg, { 
+            u_colorTexture: this.colorTexture
+        });
+        twgl.drawBufferInfo(gl, this.quadBufferInfo);
+
+        // blur pass
+        twgl.bindFramebufferInfo(gl, this.blurFBO);
+        gl.bindVertexArray(this.quadVAO);
+        gl.useProgram(this.blurPrg.program);
+        twgl.setUniforms(this.blurPrg, { 
+            u_colorTexture: this.highpassTexture
+        });
+        twgl.drawBufferInfo(gl, this.quadBufferInfo);
+
+        // composite the final image
+        twgl.bindFramebufferInfo(gl, null);
+        gl.viewport(0, 0, this.viewportSize[0], this.viewportSize[1]);
+        gl.bindVertexArray(this.quadVAO);
+        gl.useProgram(this.compositePrg.program);
+        twgl.setUniforms(this.compositePrg, { 
+            u_bloomTexture: this.blurTexture,
+            u_colorTexture: this.colorTexture
+        });
+        twgl.drawBufferInfo(gl, this.quadBufferInfo);
+
+
         if (this.isDev) {
             // draw helper view of particle texture
-            twgl.bindFramebufferInfo(gl, null);
+            /*twgl.bindFramebufferInfo(gl, null);
             gl.viewport(0, 0, this.viewportSize[0] / 2, this.viewportSize[1] / 4);
             gl.bindVertexArray(this.quadVAO);
             gl.disable(gl.DEPTH_TEST);
             gl.useProgram(this.testPrg.program);
             twgl.setUniforms(this.testPrg, { 
-                u_texture: this.iceNormal
+                u_texture: this.iceTexture
             });
-            twgl.drawBufferInfo(gl, this.quadBufferInfo);
+            twgl.drawBufferInfo(gl, this.quadBufferInfo);*/
         }
     }
 

@@ -64,7 +64,7 @@ export class ArcballControl {
 
             // get the amount of rotation
             const d = Math.max(-1, Math.min(1, vec3.dot(np, nq)));
-            const angle = Math.acos(d) * timeScale * 5;
+            const angle = Math.acos(d) * timeScale * 3;
 
             this.velocity = angle;
             this.rotationAxis = vec3.clone(axis);
