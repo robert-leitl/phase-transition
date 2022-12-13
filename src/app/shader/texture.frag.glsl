@@ -165,7 +165,7 @@ void main() {
 
     float n1 = fbm(dir);
 
-    vec3[2] voronoi1 = voronoi3d(dir * 2.5 * (1. - n1 * 0.2));
+    vec3[2] voronoi1 = voronoi3d(dir * 2.6 * (1. - n1 * 0.12));
     vec3[2] voronoi2 = voronoi3d(dir * 1.5 * (1. - n1 * 0.3));
     vec3[2] voronoi3 = voronoi3d(dir * 3.0 * (1. - n1 * 0.4));
     vec3 v1 = voronoi1[0];
@@ -176,7 +176,7 @@ void main() {
     // generate the displacement value
     float sp = sphericalDistance(dir, c);
     float disp = v1.r * 0.5 + sp * sp;
-    disp = v1.r + (disp * 2. - 1.) * 0.4;
+    disp = v1.r + (disp * 2. - 1.) * 0.5;
 
     // generate the ice textures
     float ice1 = pow(v1.r, 3.);

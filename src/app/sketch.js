@@ -163,14 +163,17 @@ export class Sketch {
         const gl = this.gl;
 
         // render the texture
-        twgl.bindFramebufferInfo(gl, this.textureFBO);
-        gl.bindVertexArray(this.quadVAO);
-        gl.disable(gl.CULL_FACE);
-        gl.disable(gl.DEPTH_TEST);
-        this.gl.clearColor(0, 0, 0, 1);
-        this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
-        this.gl.useProgram(this.texturePrg.program);
-        twgl.drawBufferInfo(gl, this.quadBufferInfo);
+        if (!this.prerender) {
+            this.prerender = true;
+            twgl.bindFramebufferInfo(gl, this.textureFBO);
+            gl.bindVertexArray(this.quadVAO);
+            gl.disable(gl.CULL_FACE);
+            gl.disable(gl.DEPTH_TEST);
+            this.gl.clearColor(0, 0, 0, 1);
+            this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+            this.gl.useProgram(this.texturePrg.program);
+            twgl.drawBufferInfo(gl, this.quadBufferInfo);
+        }
 
 
         twgl.bindFramebufferInfo(gl, null);

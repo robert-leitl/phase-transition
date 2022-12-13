@@ -35,7 +35,8 @@ vec3 distort(vec3 pos) {
   vec4 map = texture(u_iceTexture, st);
 
   float h = map.a;
-  float offset = 1. + (h * 0.05 - 0.025);
+  float s = 0.03;
+  float offset = 1. + (h * s - s * .5);
 
   return pos * offset;
 }
