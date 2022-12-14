@@ -30,5 +30,5 @@ vec4 gaussianBlur2D(in sampler2D tex, in vec2 st, in vec2 offset, const int kern
 
 void main() {
     vec2 texSize = vec2(textureSize(u_colorTexture, 0));
-    outColor = gaussianBlur2D(u_colorTexture, v_uv, (1. / texSize) * 5., 30) * 1.6;
+    outColor = gaussianBlur2D(u_colorTexture, v_uv, (1. / texSize) * 3., 30) * 1.6;
 }

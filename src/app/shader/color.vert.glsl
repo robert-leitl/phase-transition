@@ -43,6 +43,7 @@ vec3 distort(vec3 pos) {
 
 void main() {
   vec3 pos = distort(a_position);
+  pos = a_position;
   vec2 equirect = dir2equirect(a_position);
   
   vec4 worldPosition = u_worldMatrix * vec4(pos, 1.);
@@ -53,6 +54,7 @@ void main() {
   v_worldPosition = worldPosition.xyz;
   v_surfaceToView = u_cameraPos - worldPosition.xyz;
   vec4 tangent = u_worldInverseTransposeMatrix * vec4(a_tangent, 0.);
-  v_tangent = tangent.xyz;
+  v_tangent = a_tangent;
   v_normal = (u_worldInverseTransposeMatrix * vec4(a_normal, 0.)).xyz;
+  v_normal = a_normal;
 }

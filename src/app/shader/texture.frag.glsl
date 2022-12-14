@@ -2,6 +2,8 @@
 
 precision highp float;
 
+uniform sampler2D u_concreteTexture;
+
 layout(location = 0) out vec4 outTexture;
 layout(location = 1) out vec4 outNormal;
 
@@ -10,7 +12,59 @@ in vec2 v_texcoord;
 #define PI 3.1415926535897932384626433832795
 #define TWO_PI 6.2831853071795864769252867665590
 
-#include 'voronoi-3d.glsl'
+vec3 random3(vec3 p) {
+    p = fract(p * vec3(.1031, .1030, .0973));
+    p += dot(p, p.yxz+19.19);
+    return fract((p.xxy + p.yzz)*p.zyx);
+}
+
+vec4[2] voronoi( in vec3 x ) {
+  vec3 n = floor(x);
+  vec3 f = fract(x);
+
+  //----------------------------------
+  // first pass: regular voronoi
+  //----------------------------------
+  vec3 mg, mr;
+
+  vec3 c;
+  float md = 8.0;
+  for( int j=-1; j<=1; j++ )
+  for( int i=-1; i<=1; i++ )
+  for( int k=-1; k<=1; k++ )
+  {
+      vec3 g = vec3(float(i),float(j),float(k));
+      vec3 o = random3( n + g );
+      vec3 r = g + o - f;
+      float d = dot(r,r);
+
+      if( d < md )
+      {
+          md = d;
+          mr = r;
+          mg = g;
+          c = g + o;
+      }
+  }
+
+  //----------------------------------
+  // second pass: distance to borders
+  //----------------------------------
+  md = 8.0;
+  for( int j=-2; j<=2; j++ )
+  for( int i=-2; i<=2; i++ )
+  for( int k=-1; k<=1; k++ )
+  {
+      vec3 g = mg + vec3(float(i),float(j),float(k));
+      vec3 o = random3( n + g );
+      vec3 r = g + o - f;
+
+      if( dot(mr-r,mr-r)>0.00001 )
+      md = min( md, dot( 0.5*(mr+r), normalize(r-mr) ) );
+  }
+
+  return vec4[2]( vec4(md, mr), vec4(c, 0.) );
+}
 
 vec3 cart2equirect(vec2 uv) {
     float Phi = PI - uv.y * PI;
@@ -138,16 +192,16 @@ float snoise(in vec3 v) {
                                 dot(p2,x2), dot(p3,x3) ) );
 }
 
-float fbm(in vec3 pos) {
+float fbm(in vec3 pos, in float ampScale) {
     // Initial values
     float value = 0.0;
-    float amplitud = 0.5;
+    float amplitud = 0.3;
 
     // Loop of octaves
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 25; i++) {
         value += amplitud * snoise(pos);
         pos *= 2.;
-        amplitud *= .5;
+        amplitud *= ampScale;
     }
     return value;
 }
@@ -163,28 +217,43 @@ void main() {
     vec2 st = v_texcoord;
     vec3 dir = normalize(cart2equirect(st));
 
-    float n1 = fbm(dir);
+    float n0 = fbm(dir, 0.7);
+    float n1 = fbm(dir, 0.6);
 
-    vec3[2] voronoi1 = voronoi3d(dir * 2.6 * (1. - n1 * 0.12));
-    vec3[2] voronoi2 = voronoi3d(dir * 1.5 * (1. - n1 * 0.3));
-    vec3[2] voronoi3 = voronoi3d(dir * 3.0 * (1. - n1 * 0.4));
-    vec3 v1 = voronoi1[0];
-    vec3 v2 = voronoi2[0];
-    vec3 v3 = voronoi3[0];
-    vec3 c = normalize(voronoi1[1]);
+    vec4[2] voronoi0 = voronoi(dir * 2.5 * (1. - n0 * 0.12));
+    vec4[2] voronoi1 = voronoi(dir * 2.5 * (1. - n1 * 0.2));
+    vec4[2] voronoi2 = voronoi(dir * 1.5 * (1. - n1 * 0.3));
+    vec4[2] voronoi3 = voronoi(dir * 3.0 * (1. - n1 * 0.4));
+    vec4 v0 = voronoi0[0];
+    vec4 v1 = voronoi1[0];
+    vec4 v2 = voronoi2[0];
+    vec4 v3 = voronoi3[0];
+    vec3 c = normalize(voronoi1[1].xyz);
 
     // generate the displacement value
     float sp = sphericalDistance(dir, c);
-    float disp = v1.r * 0.5 + sp * sp;
+    float disp = length(v1.yzw) * 0.5 + sp * sp;
     disp = v1.r + (disp * 2. - 1.) * 0.5;
 
     // generate the ice textures
-    float ice1 = pow(v1.r, 3.);
-    float ice2 = pow(v2.r, 4.);
-    float ice3 = pow(v3.r, 5.);
-    float dirt = fbm(dir * 1000.);
+    float dirt = fbm(dir * 1000., 0.7);
+    float dirt2 = 0.8 * fbm(dir * 10., 0.7) + 0.2;
+    float dirt3 = 0.8 * fbm(dir * 3., 0.7) + 0.2;
+    float ice1 = 0.;
+    float ice2 = 0.;
+    ice2 += smoothstep(0.3, 1., length(v1.yzw)) * 0.4;
+    ice2 += smoothstep(0.1, 1., length(v1.yzw)) * 0.3 * dirt3;
+    ice2 += smoothstep(0.5, 1., length(v3.yzw)) * .2;
+    ice2 += (1. - smoothstep(0.00, 0.1, v2.r)) * 0.1;
+    ice2 += (1. - smoothstep(0.00, 0.8, v2.r)) * 0.5 * dirt;
+    ice1 += abs((1. - smoothstep(0.00, 0.004, v0.r)) * 1. * dirt3);
+    ice1 += abs((1. - smoothstep(0.00, 0.03, v1.r)) * .8 * dirt3);
+    ice1 += abs((1. - smoothstep(0.00, 0.004, v0.r)) * 0.4 * dirt2);
+    ice1 += abs((1. - smoothstep(0.00, 0.09, v0.r)) * 0.1);
+    //float ice2 = pow(length(v2.yzw), 4.);
+    float ice3 = pow(length(v3.yzw), 5.);
     ice1 -= dirt * 0.05;
-    ice2 -= dirt * 0.075;
+    //ice2 -= dirt * 0.075;
     ice3 -= dirt * 0.1;
 
     // generate normal map from the center point normal

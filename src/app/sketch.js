@@ -67,8 +67,8 @@ export class Sketch {
         mat4.fromQuat(this.worldMatrix, this.control.rotationQuat);
 
         // update the world inverse transpose
-        mat4.invert(this.worldInverseTransposeMatrix, this.worldMatrix);
-        mat4.transpose(this.worldInverseTransposeMatrix, this.worldInverseTransposeMatrix);
+        mat4.invert(this.worldInverseMatrix, this.worldMatrix);
+        mat4.transpose(this.worldInverseTransposeMatrix, this.worldInverseMatrix);
 
         this.#animate(this.#deltaTime);
         this.#render();
@@ -124,7 +124,7 @@ export class Sketch {
             this.canvas.clientHeight
         );
 
-        await this.#initDirtMap();
+        await this.#initImageTextures();
 
         // Setup Programs
         this.colorPrg = twgl.createProgramInfo(gl, [colorVert, colorFrag]);
@@ -179,6 +179,7 @@ export class Sketch {
         this.blurTexture = this.blurFBO.attachments[0];
 
         this.worldMatrix = mat4.create();
+        this.worldInverseMatrix = mat4.create();
         this.worldInverseTransposeMatrix = mat4.create();
         
         this.control = new ArcballControl(this.canvas);
@@ -189,15 +190,23 @@ export class Sketch {
         this.resize();
     }
 
-    #initDirtMap() {
+    #initImageTextures() {
         /** @type {WebGLRenderingContext} */
         const gl = this.gl;
 
-        return new Promise((resolve) => {
+        const dirtTexturePromise = new Promise((resolve) => {
             this.dirtTexture = twgl.createTexture(gl, {
                 src: new URL('../assets/dirt.jpg', import.meta.url).toString(),
             }, () => resolve());
         });
+
+        const concreteTexturePromise = new Promise((resolve) => {
+            this.concreteTexture = twgl.createTexture(gl, {
+                src: new URL('../assets/concrete.jpg', import.meta.url).toString(),
+            }, () => resolve());
+        });
+
+        return Promise.all([dirtTexturePromise, concreteTexturePromise]);
     }
 
     #initTweakpane() {
@@ -227,11 +236,14 @@ export class Sketch {
             this.gl.clearColor(0, 0, 0, 1);
             this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
             this.gl.useProgram(this.texturePrg.program);
+            twgl.setUniforms(this.texturePrg, {
+                u_concreteTexture: this.concreteTexture
+            });
             twgl.drawBufferInfo(gl, this.quadBufferInfo);
         }
 
 
-        twgl.bindFramebufferInfo(gl, this.drawFBO);
+        twgl.bindFramebufferInfo(gl, null /* this.drawFBO */ );
         gl.enable(gl.CULL_FACE);
         gl.enable(gl.DEPTH_TEST);
         this.gl.clearColor(0, 0, 0, 1);
@@ -242,6 +254,7 @@ export class Sketch {
             u_viewMatrix: this.camera.matrices.view,
             u_projectionMatrix: this.camera.matrices.projection,
             u_worldInverseTransposeMatrix: this.worldInverseTransposeMatrix,
+            u_worldInverseMatrix: this.worldInverseMatrix,
             u_cameraPos: this.camera.position,
             u_time: this.#time,
             u_iceTexture: this.iceTexture,
@@ -257,7 +270,7 @@ export class Sketch {
         );
 
         // get highpass
-        twgl.bindFramebufferInfo(gl, this.highpassFBO);
+        /*twgl.bindFramebufferInfo(gl, this.highpassFBO);
         gl.bindVertexArray(this.quadVAO);
         gl.useProgram(this.highpassPrg.program);
         twgl.setUniforms(this.highpassPrg, { 
@@ -283,12 +296,12 @@ export class Sketch {
             u_bloomTexture: this.blurTexture,
             u_colorTexture: this.colorTexture
         });
-        twgl.drawBufferInfo(gl, this.quadBufferInfo);
+        twgl.drawBufferInfo(gl, this.quadBufferInfo);*/
 
 
         if (this.isDev) {
             // draw helper view of particle texture
-            /*twgl.bindFramebufferInfo(gl, null);
+            twgl.bindFramebufferInfo(gl, null);
             gl.viewport(0, 0, this.viewportSize[0] / 2, this.viewportSize[1] / 4);
             gl.bindVertexArray(this.quadVAO);
             gl.disable(gl.DEPTH_TEST);
@@ -296,7 +309,7 @@ export class Sketch {
             twgl.setUniforms(this.testPrg, { 
                 u_texture: this.iceTexture
             });
-            twgl.drawBufferInfo(gl, this.quadBufferInfo);*/
+            twgl.drawBufferInfo(gl, this.quadBufferInfo);
         }
     }
 
