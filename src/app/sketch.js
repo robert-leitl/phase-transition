@@ -113,6 +113,7 @@ export class Sketch {
         this.gl = this.canvas.getContext('webgl2', { antialias: false, alpha: false });
 
         this.touchevents = Modernizr.touchevents;
+        this.viewportSize = vec2.create();
 
         /** @type {WebGLRenderingContext} */
         const gl = this.gl;
