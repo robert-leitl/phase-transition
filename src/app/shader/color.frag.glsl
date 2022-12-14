@@ -113,7 +113,7 @@ vec2 parallaxOffset(float ratio, vec3 tangentSpaceViewDir) {
 }
 
 void main() {
-    vec3 P = normalize(v_position);
+    /*vec3 P = normalize(v_position);
     vec3 V = normalize(v_surfaceToView);
 
     // get equirect coords
@@ -192,5 +192,6 @@ void main() {
 
     //outColor = vec4(iceColor, 0.);
 
-   // outColor = vec4(iceColor + v_tangent * 0.5, 0.);
+   // outColor = vec4(iceColor + v_tangent * 0.5, 0.);*/
+   outColor = vec4(1.);
 }
