@@ -37,4 +37,4 @@ fromEvent(window, 'load').pipe(take(1)).subscribe(() => resize());
 // INIT APP
 const canvasElm = document.querySelector('canvas');
 sketch = new Sketch(canvasElm, (instance) => instance.run(), isDev, pane);
-resize();
+//resize();
