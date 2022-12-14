@@ -206,7 +206,7 @@ export class Sketch {
             }, () => resolve());
         });
 
-        return Promise.all([dirtTexturePromise, concreteTexturePromise]);
+        return Promise.all([dirtTexturePromise]);
     }
 
     #initTweakpane() {
