@@ -35,7 +35,7 @@ vec3 distort(vec3 pos) {
   vec4 map = texture(u_iceTexture, st);
 
   float h = map.a;
-  float s = 0.03;
+  float s = .1;
   float offset = 1. + (h * s - s * .5);
 
   return pos * offset;
@@ -43,7 +43,6 @@ vec3 distort(vec3 pos) {
 
 void main() {
   vec3 pos = distort(a_position);
-  pos = a_position;
   vec2 equirect = dir2equirect(a_position);
   
   vec4 worldPosition = u_worldMatrix * vec4(pos, 1.);
@@ -53,8 +52,6 @@ void main() {
   v_texcoord = a_texcoord;
   v_worldPosition = worldPosition.xyz;
   v_surfaceToView = u_cameraPos - worldPosition.xyz;
-  vec4 tangent = u_worldInverseTransposeMatrix * vec4(a_tangent, 0.);
-  v_tangent = a_tangent;
+  v_tangent = (u_worldInverseTransposeMatrix * vec4(a_tangent, 0.)).xyz;
   v_normal = (u_worldInverseTransposeMatrix * vec4(a_normal, 0.)).xyz;
-  v_normal = a_normal;
 }

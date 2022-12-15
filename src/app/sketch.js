@@ -28,7 +28,7 @@ export class Sketch {
     #deltaFrames = 0;
     
     // the scale factor for the bloom and lensflare highpass texture
-    SS_FX_SCALE = 0.4;
+    SS_FX_SCALE = 0.2;
 
     camera = {
         matrix: mat4.create(),
@@ -160,7 +160,7 @@ export class Sketch {
             2048, 1024
         );
         this.iceTexture = this.textureFBO.attachments[0];
-        this.iceNormal = this.textureFBO.attachments[1];
+        this.iceNormalTexture = this.textureFBO.attachments[1];
         this.drawFBO = twgl.createFramebufferInfo(gl, [{attachmentPoint: gl.COLOR_ATTACHMENT0}], this.viewportSize[0], this.viewportSize[1]);
         this.colorTexture = this.drawFBO.attachments[0];
         this.highpassFBO = twgl.createFramebufferInfo(
@@ -206,6 +206,20 @@ export class Sketch {
             }, () => resolve());
         });
 
+        const envMapPromise = new Promise(resolve => {
+            this.envMapTexture = twgl.createTexture(gl, {
+                target: gl.TEXTURE_CUBE_MAP,
+                src: [
+                '../assets/env/posx.jpg',
+                '../assets/env/negx.jpg',
+                '../assets/env/posy.jpg',
+                '../assets/env/negy.jpg',
+                '../assets/env/posz.jpg',
+                '../assets/env/negz.jpg',
+                ],
+            }, () => resolve())
+        })
+
         return Promise.all([dirtTexturePromise]);
     }
 
@@ -243,7 +257,7 @@ export class Sketch {
         }
 
 
-        twgl.bindFramebufferInfo(gl, null /* this.drawFBO */ );
+        twgl.bindFramebufferInfo(gl, this.drawFBO );
         gl.enable(gl.CULL_FACE);
         gl.enable(gl.DEPTH_TEST);
         this.gl.clearColor(0, 0, 0, 1);
@@ -258,8 +272,9 @@ export class Sketch {
             u_cameraPos: this.camera.position,
             u_time: this.#time,
             u_iceTexture: this.iceTexture,
-            u_iceNormal: this.iceNormal,
-            u_dirtTexture: this.dirtTexture
+            u_iceNormal: this.iceNormalTexture,
+            u_dirtTexture: this.dirtTexture,
+            u_envMapTexture: this.envMapTexture
         });
         gl.bindVertexArray(this.modelVAO);
         gl.drawElements(
@@ -270,7 +285,7 @@ export class Sketch {
         );
 
         // get highpass
-        /*twgl.bindFramebufferInfo(gl, this.highpassFBO);
+        twgl.bindFramebufferInfo(gl, this.highpassFBO);
         gl.bindVertexArray(this.quadVAO);
         gl.useProgram(this.highpassPrg.program);
         twgl.setUniforms(this.highpassPrg, { 
@@ -296,7 +311,7 @@ export class Sketch {
             u_bloomTexture: this.blurTexture,
             u_colorTexture: this.colorTexture
         });
-        twgl.drawBufferInfo(gl, this.quadBufferInfo);*/
+        twgl.drawBufferInfo(gl, this.quadBufferInfo);
 
 
         if (this.isDev) {
@@ -307,7 +322,7 @@ export class Sketch {
             gl.disable(gl.DEPTH_TEST);
             gl.useProgram(this.testPrg.program);
             twgl.setUniforms(this.testPrg, { 
-                u_texture: this.iceTexture
+                u_texture: this.iceNormalTexture
             });
             twgl.drawBufferInfo(gl, this.quadBufferInfo);
         }

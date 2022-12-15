@@ -12,6 +12,10 @@ in vec2 v_texcoord;
 #define PI 3.1415926535897932384626433832795
 #define TWO_PI 6.2831853071795864769252867665590
 
+float random(in vec3 pos) {
+  return fract(sin(dot(pos.xyz, vec3(70.9898, 78.233, 32.4355))) * 43758.5453123);
+}
+
 vec3 random3(vec3 p) {
     p = fract(p * vec3(.1031, .1030, .0973));
     p += dot(p, p.yxz+19.19);
@@ -21,14 +25,11 @@ vec3 random3(vec3 p) {
 vec4[2] voronoi( in vec3 x ) {
   vec3 n = floor(x);
   vec3 f = fract(x);
-
-  //----------------------------------
-  // first pass: regular voronoi
-  //----------------------------------
   vec3 mg, mr;
 
   vec3 c;
   float md = 8.0;
+  float id;
   for( int j=-1; j<=1; j++ )
   for( int i=-1; i<=1; i++ )
   for( int k=-1; k<=1; k++ )
@@ -43,13 +44,11 @@ vec4[2] voronoi( in vec3 x ) {
           md = d;
           mr = r;
           mg = g;
-          c = g + o;
+          c = r;
+          id = smoothstep(0., 1., length(o) * 0.15);
       }
   }
-
-  //----------------------------------
-  // second pass: distance to borders
-  //----------------------------------
+  
   md = 8.0;
   for( int j=-2; j<=2; j++ )
   for( int i=-2; i<=2; i++ )
@@ -63,7 +62,7 @@ vec4[2] voronoi( in vec3 x ) {
       md = min( md, dot( 0.5*(mr+r), normalize(r-mr) ) );
   }
 
-  return vec4[2]( vec4(md, mr), vec4(c, 0.) );
+  return vec4[2]( vec4(md, mr), vec4(c, float(id)) );
 }
 
 vec3 cart2equirect(vec2 uv) {
@@ -229,14 +228,14 @@ void main() {
     vec4 v2 = voronoi2[0];
     vec4 v3 = voronoi3[0];
     vec3 c = normalize(voronoi1[1].xyz);
+    float id = voronoi1[1].w;
 
     // generate the displacement value
     float sp = sphericalDistance(dir, c);
-    float disp = length(v1.yzw) * 0.5 + sp * sp;
-    disp = v1.r + (disp * 2. - 1.) * 0.5;
+    float disp = length(v1.yzw) * 0.3 + id * 2.;
 
     // generate the ice textures
-    float dirt = fbm(dir * 1000., 0.7);
+    float dirt1 = fbm(dir * 1000., 0.7);
     float dirt2 = 0.8 * fbm(dir * 10., 0.7) + 0.2;
     float dirt3 = 0.8 * fbm(dir * 3., 0.7) + 0.2;
     float ice1 = 0.;
@@ -245,16 +244,14 @@ void main() {
     ice2 += smoothstep(0.1, 1., length(v1.yzw)) * 0.3 * dirt3;
     ice2 += smoothstep(0.5, 1., length(v3.yzw)) * .2;
     ice2 += (1. - smoothstep(0.00, 0.1, v2.r)) * 0.1;
-    ice2 += (1. - smoothstep(0.00, 0.8, v2.r)) * 0.5 * dirt;
+    ice2 += (1. - smoothstep(0.00, 0.8, v2.r)) * 0.5 * dirt1;
     ice1 += abs((1. - smoothstep(0.00, 0.004, v0.r)) * 1. * dirt3);
     ice1 += abs((1. - smoothstep(0.00, 0.03, v1.r)) * .8 * dirt3);
     ice1 += abs((1. - smoothstep(0.00, 0.004, v0.r)) * 0.4 * dirt2);
     ice1 += abs((1. - smoothstep(0.00, 0.09, v0.r)) * 0.1);
-    //float ice2 = pow(length(v2.yzw), 4.);
     float ice3 = pow(length(v3.yzw), 5.);
-    ice1 -= dirt * 0.05;
-    //ice2 -= dirt * 0.075;
-    ice3 -= dirt * 0.1;
+    ice1 -= dirt1 * 0.05;
+    ice3 -= dirt1 * 0.1;
 
     // generate normal map from the center point normal
     vec3 N = dir;
@@ -262,7 +259,11 @@ void main() {
     vec3 B = (cross(T, N));
     T = normalize(cross(N, B));
     mat3 inversTangentSpace = inverse(mat3(T, B, N));
-    vec3 normal = normalize(c + dir * smoothstep(0.3, 0.8, sp + dirt * 0.1 + n1 ));
+    vec3 normal = normalize(c * 0.4 + dir * dirt2 * 0.3 * ice1 * 100.);
+    vec3 o = dir - c;
+    float w1 = (1. - smoothstep(0.00, 0.3, length(v0.r))) * 0.3 + dirt2 * 0.1 + ice1 * 2.5;
+    float w2 = (1. - smoothstep(0.00, 0.03, length(v0.r))) * 0.7;
+    normal = normalize(dir + o * w1 + o * w2);
     vec3 normalOffset = inversTangentSpace * normal;
 
     outTexture = vec4(ice1, ice2, ice3, disp);
