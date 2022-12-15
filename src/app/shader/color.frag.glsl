@@ -10,6 +10,9 @@ uniform sampler2D u_dirtTexture;
 uniform samplerCube u_envMapTexture;
 uniform vec3 u_cameraPos;
 uniform float u_time;
+uniform float u_progress1;
+uniform float u_progress2;
+uniform float u_progress3;
 
 out vec4 outColor;
 
@@ -69,33 +72,6 @@ vec3 water(float x) {
     return pow(vec3(.1, .7, .8), vec3(4.* saturate(1.0-x) ));
 }
 
-vec3 tonemapUncharted2(vec3 color) {
-    float A = 0.15; // 0.22
-    float B = 0.50; // 0.30
-    float C = 0.10;
-    float D = 0.20;
-    float E = 0.02; // 0.01
-    float F = 0.30;
-    float W = 11.2;
-    
-    vec4 x = vec4(color, W);
-    x = ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F;
-    return x.xyz / x.w;
-}
-
-vec4 tonemapUncharted2(const vec4 x) { return vec4( tonemapUncharted2(x.rgb), x.a); }
-
-vec3 tonemapUnreal(const vec3 x) { return x / (x + 0.155) * 1.019; }
-vec4 tonemapUnreal(const vec4 x) { return vec4(tonemapUnreal(x.rgb), x.a); }
-
-vec3 tonemapFilmic(vec3 color) {
-    color = max(vec3(0.0), color - 0.004);
-    color = (color * (6.2 * color + 0.5)) / (color * (6.2 * color + 1.7) + 0.06);
-    return color;
-}
-
-vec4 tonemapFilmic(const vec4 x) { return vec4( tonemapFilmic(x.rgb), x.a ); }
-
 float brightnessContrast( float value, float brightness, float contrast ) {
     return ( value - 0.5 ) * contrast + 0.5 + brightness;
 }
@@ -141,12 +117,12 @@ void main() {
     vec3 gradColor1 = vec3(1.);
     vec3 gradColor2 = vec3(0.4, 0.8, 1.);
     vec3 gradColor3 = vec3(0.0, 0.05, .1);
-    float t = smoothstep(0., 1., iceValue);
     vec3 iceColor = mix(gradColor2, gradColor1, iceValue);
     iceColor = mix(gradColor3, iceColor, iceValue * 0.3 + 0.1);
     iceColor = mix(iceColor, water(iceValue), min(iceValue, 0.3));
     iceColor += vec3(smoothstep(0.1, 1., iceLayer1.r) * 0.9);
-    iceColor += vec3(smoothstep(0.1, 1., iceLayer1.g) * 0.3);
+    iceColor = mix(water(length(vec3(0., 0., 1.) - v_normal) * 0.01) * 0.4, iceColor, u_progress3);
+    iceColor += vec3(smoothstep(0.1, 1., iceLayer1.g) * 0.3) * u_progress2;
 
     // get the normal offsets
     vec3 normalOffset = texture(u_iceNormal, equirect).xyz * 2. - 1.;
@@ -159,20 +135,21 @@ void main() {
     vec3 B = normalize(cross(N, T));
     vec3 R = reflect(N, -L);
     mat3 tangentSpace = mat3(T, B, N);
-    N = normalize(mix(N, tangentSpace * normalOffset, .8));
+    N = normalize(mix(N, tangentSpace * normalOffset, .8 * u_progress3));
 
     // basic lighting
-    float specularValue = specularBlinnPhong(L, N, V, 400.);
-    vec3 specular = specularValue * vec3(1., .9, .8) * .7;
+    float specularValue = specularBlinnPhong(L, N, V, mix(400., 300., u_progress2));
+    vec3 specular = specularValue * vec3(1., .9, .8) * (.7 - u_progress2 * 0.2);
     float diffuse = max(0., dot(N, L)) * 0.1;
     float fresnelValue = 1. - dot(N, V);
-    float fresnel = fresnelValue * fresnelValue * fresnelValue;
-    fresnel *= .2;
+    fresnelValue = fresnelValue * fresnelValue * fresnelValue;
+    float fresnel = fresnelValue * .2;
 
     // env reflection
-    vec4 env = texture(u_envMapTexture, N) * fresnelValue * 0.2;
+    vec4 env = texture(u_envMapTexture, N) * fresnelValue * ((1. - u_progress2) * 0.8 + 0.2);
 
 
     outColor = vec4(iceColor + specular + diffuse + fresnel + env.rgb, 0.);
     outColor = brightnessContrast(outColor, .1, 2.);
+
 }

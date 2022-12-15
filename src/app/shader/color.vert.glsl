@@ -8,6 +8,9 @@ uniform float u_time;
 uniform sampler2D u_iceTexture;
 uniform sampler2D u_iceNormal;
 uniform vec3 u_cameraPos;
+uniform float u_progress1;
+uniform float u_progress2;
+uniform float u_progress3;
 
 in vec3 a_position;
 in vec3 a_normal;
@@ -30,20 +33,20 @@ vec2 dir2equirect(highp vec3 dir) {
   return uv;
 }
 
-vec3 distort(vec3 pos) {
+void main() {
+  vec3 pos = a_position;
   vec2 st = dir2equirect(pos);
   vec4 map = texture(u_iceTexture, st);
+  float h = (map.a - 0.2) * .1;
+  float displacement = 1. + (h ) * u_progress3;
+  float wobble = cos(u_time * 0.0015 + pos.y * 2.) * 0.04 + sin(u_time * 0.0025 + pos.x * 2.) * 0.04 + 1.;
+  float dX = cos(2. * pos.x + u_time * 0.0025) * 0.08;
+  float dY = -sin(2. * pos.y + u_time * 0.0015) * 0.08;
+  float dZ = 0.;
+  vec3 wN = normalize(vec3(dX, dY, dZ) + normalize(pos));
 
-  float h = map.a;
-  float s = .1;
-  float offset = 1. + (h * s - s * .5);
-
-  return pos * offset;
-}
-
-void main() {
-  vec3 pos = distort(a_position);
-  vec2 equirect = dir2equirect(a_position);
+  pos *= mix(wobble, displacement, u_progress1);
+  vec3 N = mix(wN, a_normal, u_progress1);
   
   vec4 worldPosition = u_worldMatrix * vec4(pos, 1.);
   gl_Position = u_projectionMatrix * u_viewMatrix * worldPosition;
@@ -53,5 +56,5 @@ void main() {
   v_worldPosition = worldPosition.xyz;
   v_surfaceToView = u_cameraPos - worldPosition.xyz;
   v_tangent = (u_worldInverseTransposeMatrix * vec4(a_tangent, 0.)).xyz;
-  v_normal = (u_worldInverseTransposeMatrix * vec4(a_normal, 0.)).xyz;
+  v_normal = (u_worldInverseTransposeMatrix * vec4(N, 0.)).xyz;
 }

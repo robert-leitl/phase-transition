@@ -4,6 +4,7 @@ precision highp float;
 
 uniform sampler2D u_colorTexture;
 uniform sampler2D u_bloomTexture;
+uniform sampler2D u_stainTexture;
 
 out vec4 outColor;
 
@@ -24,6 +25,7 @@ vec3 blendScreen(vec3 base, vec3 blend, float opacity) {
 void main() {
     vec4 color = texture(u_colorTexture, v_uv);
     vec4 bloom = texture(u_bloomTexture, v_uv);
+    vec4 stain = texture(u_stainTexture, v_uv);
 
     vec3 comp = blendScreen(color.rgb, bloom.rgb, 0.5);
 

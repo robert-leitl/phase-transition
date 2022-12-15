@@ -16,6 +16,7 @@ import blurVert from './shader/blur.vert.glsl';
 import blurFrag from './shader/blur.frag.glsl';
 import compositeVert from './shader/composite.vert.glsl';
 import compositeFrag from './shader/composite.frag.glsl';
+import { easeInOutCubic, easeInOutExpo } from "./utils";
 
 export class Sketch {
 
@@ -30,10 +31,13 @@ export class Sketch {
     // the scale factor for the bloom and lensflare highpass texture
     SS_FX_SCALE = 0.2;
 
+    // animation properties
+    TRANSITION_DURATION = 60;
+
     camera = {
         matrix: mat4.create(),
         near: 0.1,
-        far: 6,
+        far: 5,
         fov: Math.PI / 3,
         aspect: 1,
         position: vec3.fromValues(0, 0, 3),
@@ -45,6 +49,10 @@ export class Sketch {
             inversViewProjection: mat4.create()
         }
     };
+
+    settings = {
+        progress: 0
+    }
     
     constructor(canvasElm, onInit = null, isDev = false, pane = null) {
         this.canvas = canvasElm;
@@ -102,7 +110,10 @@ export class Sketch {
             }
 
             if (this.drawFBO) {
-                twgl.resizeFramebufferInfo(gl, this.drawFBO, [{attachmentPoint: gl.COLOR_ATTACHMENT0}], this.viewportSize[0], this.viewportSize[1]);
+                twgl.resizeFramebufferInfo(gl, this.drawFBO, [
+                    {attachmentPoint: gl.COLOR_ATTACHMENT0},
+                    {attachmentPoint: gl.DEPTH_ATTACHMENT, format: gl.DEPTH_COMPONENT, internalFormat: gl.DEPTH_COMPONENT32F}
+                ], this.viewportSize[0], this.viewportSize[1]);
             }
         }
 
@@ -161,7 +172,10 @@ export class Sketch {
         );
         this.iceTexture = this.textureFBO.attachments[0];
         this.iceNormalTexture = this.textureFBO.attachments[1];
-        this.drawFBO = twgl.createFramebufferInfo(gl, [{attachmentPoint: gl.COLOR_ATTACHMENT0}], this.viewportSize[0], this.viewportSize[1]);
+        this.drawFBO = twgl.createFramebufferInfo(gl, [
+            {attachmentPoint: gl.COLOR_ATTACHMENT0},
+            {attachmentPoint: gl.DEPTH_ATTACHMENT, format: gl.DEPTH_COMPONENT, internalFormat: gl.DEPTH_COMPONENT32F}
+        ], this.viewportSize[0], this.viewportSize[1]);
         this.colorTexture = this.drawFBO.attachments[0];
         this.highpassFBO = twgl.createFramebufferInfo(
             gl, 
@@ -182,12 +196,26 @@ export class Sketch {
         this.worldInverseMatrix = mat4.create();
         this.worldInverseTransposeMatrix = mat4.create();
         
+        this.progress = 0;
         this.control = new ArcballControl(this.canvas);
         this.#initTweakpane();
         this.#updateCameraMatrix();
         this.#updateProjectionMatrix(gl);
+        this.#initEvents();
 
         this.resize();
+    }
+
+    #initEvents() {
+        this.isPointerDown = false;
+
+        fromEvent(this.canvas, 'pointerdown').subscribe((e) => {
+            this.isPointerDown = true;
+        });
+        merge(
+            fromEvent(this.canvas, 'pointerup'),
+            fromEvent(this.canvas, 'pointerleave')
+        ).subscribe(() => this.isPointerDown = false);
     }
 
     #initImageTextures() {
@@ -225,6 +253,13 @@ export class Sketch {
 
     #initTweakpane() {
         if (!this.pane) return;
+
+        this.animationFolder = this.pane.addFolder({ title: 'Animation', expanded: true });
+        this.animationFolder.addInput(
+            this.settings, 
+            'progress',
+            { label: 'progress', min: 0, max: 1 }
+        );
     }
 
     #animate(deltaTime) {
@@ -234,6 +269,10 @@ export class Sketch {
         // use a fixed deltaTime of 10 ms adapted to
         // device frame rate
         deltaTime = 16 * this.#deltaFrames;
+
+        this.progress += (this.isPointerDown ? -1 : 2) * deltaTime * 0.0001;
+        this.progress = Math.min(2, Math.max(0, this.progress));
+        this.settings.progress = Math.min(1, Math.max(0, this.progress));
     }
 
     #render() {
@@ -256,10 +295,8 @@ export class Sketch {
             twgl.drawBufferInfo(gl, this.quadBufferInfo);
         }
 
-
+        const p = this.settings.progress;
         twgl.bindFramebufferInfo(gl, this.drawFBO );
-        gl.enable(gl.CULL_FACE);
-        gl.enable(gl.DEPTH_TEST);
         this.gl.clearColor(0, 0, 0, 1);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
         this.gl.useProgram(this.colorPrg.program);
@@ -274,9 +311,14 @@ export class Sketch {
             u_iceTexture: this.iceTexture,
             u_iceNormal: this.iceNormalTexture,
             u_dirtTexture: this.dirtTexture,
-            u_envMapTexture: this.envMapTexture
+            u_envMapTexture: this.envMapTexture,
+            u_progress1: 1 - Math.pow((1-p), 5),
+            u_progress2: easeInOutCubic(p),
+            u_progress3: easeInOutExpo(Math.max(0, (p - 0.8) * 5))
         });
         gl.bindVertexArray(this.modelVAO);
+        gl.enable(gl.CULL_FACE);
+        gl.enable(gl.DEPTH_TEST);
         gl.drawElements(
             gl.TRIANGLES,
             this.modelBufferInfo.numElements,
@@ -309,14 +351,15 @@ export class Sketch {
         gl.useProgram(this.compositePrg.program);
         twgl.setUniforms(this.compositePrg, { 
             u_bloomTexture: this.blurTexture,
-            u_colorTexture: this.colorTexture
+            u_colorTexture: this.colorTexture,
+            u_stainTexture: this.concreteTexture
         });
         twgl.drawBufferInfo(gl, this.quadBufferInfo);
 
 
         if (this.isDev) {
             // draw helper view of particle texture
-            twgl.bindFramebufferInfo(gl, null);
+            /*twgl.bindFramebufferInfo(gl, null);
             gl.viewport(0, 0, this.viewportSize[0] / 2, this.viewportSize[1] / 4);
             gl.bindVertexArray(this.quadVAO);
             gl.disable(gl.DEPTH_TEST);
@@ -324,7 +367,7 @@ export class Sketch {
             twgl.setUniforms(this.testPrg, { 
                 u_texture: this.iceNormalTexture
             });
-            twgl.drawBufferInfo(gl, this.quadBufferInfo);
+            twgl.drawBufferInfo(gl, this.quadBufferInfo);*/
         }
     }
 
@@ -336,13 +379,13 @@ export class Sketch {
     #updateProjectionMatrix(gl) {
         this.camera.aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
 
-        /*const height = 1.3;
+        const height = 1.3;
         const distance = this.camera.position[2];
         if (this.camera.aspect > 1) {
             this.camera.fov = 2 * Math.atan( height / distance );
         } else {
             this.camera.fov = 2 * Math.atan( (height / this.camera.aspect) / distance );
-        }*/
+        }
 
         mat4.perspective(this.camera.matrices.projection, this.camera.fov, this.camera.aspect, this.camera.near, this.camera.far);
         mat4.invert(this.camera.matrices.inversProjection, this.camera.matrices.projection);

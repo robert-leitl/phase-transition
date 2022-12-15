@@ -15,7 +15,7 @@ export class ArcballControl {
         this.followPos = vec3.create();
         this.prevFollowPos = vec3.create();
         this.autoRotationSpeed = 0;
-        this.velocity = 0.00;
+        this.velocity = 0.002;
         this.rotationAxis = vec3.fromValues(0, 1, 0);
 
         canvas.style.touchAction = 'none';
@@ -72,7 +72,7 @@ export class ArcballControl {
             // get the new rotation quat
             r = quat.setAxisAngle(quat.create(), axis, angle);
         } else {
-            this.velocity *= this.velocity > 0.00 ? .95 : 1;
+            this.velocity *= this.velocity > 0.001 ? .95 : 1;
             //r = quat.setAxisAngle(quat.create(), vec3.fromValues(0, 1, 0), this.autoRotationSpeed);
             r = quat.setAxisAngle(quat.create(), this.rotationAxis, this.velocity);
         }
