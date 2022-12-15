@@ -165,10 +165,12 @@ export class Sketch {
         this.modelVAO = twgl.createVAOAndSetAttributes(gl, this.colorPrg.attribSetters, this.modelBufferInfo.attribs, this.modelBufferInfo.indices);
 
         // Setup Framebuffers
+        const resScale = Math.max(this.viewportSize[0], this.viewportSize[1]) > 800 ? 1 : 0.5;
+        console.log(resScale);
         this.textureFBO = twgl.createFramebufferInfo(
             gl, 
             [{attachmentPoint: gl.COLOR_ATTACHMENT0}, {attachmentPoint: gl.COLOR_ATTACHMENT1}], 
-            2048, 1024
+            2048 * resScale, 1024 * resScale
         );
         this.iceTexture = this.textureFBO.attachments[0];
         this.iceNormalTexture = this.textureFBO.attachments[1];
@@ -270,8 +272,8 @@ export class Sketch {
         // device frame rate
         deltaTime = 16 * this.#deltaFrames;
 
-        this.progress += (this.isPointerDown ? -1 : 2) * deltaTime * 0.0001;
-        this.progress = Math.min(2, Math.max(0, this.progress));
+        this.progress += (this.isPointerDown ? -1 : 2) * deltaTime * 0.00025;
+        this.progress = Math.min(1.5, Math.max(0, this.progress));
         this.settings.progress = Math.min(1, Math.max(0, this.progress));
     }
 
@@ -314,7 +316,7 @@ export class Sketch {
             u_envMapTexture: this.envMapTexture,
             u_progress1: 1 - Math.pow((1-p), 5),
             u_progress2: easeInOutCubic(p),
-            u_progress3: easeInOutExpo(Math.max(0, (p - 0.8) * 5))
+            u_progress3: easeInOutExpo(Math.max(0, (p - 0.5) * 2))
         });
         gl.bindVertexArray(this.modelVAO);
         gl.enable(gl.CULL_FACE);
