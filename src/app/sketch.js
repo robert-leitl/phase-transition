@@ -240,12 +240,12 @@ export class Sketch {
             this.envMapTexture = twgl.createTexture(gl, {
                 target: gl.TEXTURE_CUBE_MAP,
                 src: [
-                '../assets/env/posx.jpg',
-                '../assets/env/negx.jpg',
-                '../assets/env/posy.jpg',
-                '../assets/env/negy.jpg',
-                '../assets/env/posz.jpg',
-                '../assets/env/negz.jpg',
+                    new URL('../assets/env/posx.jpg', import.meta.url).toString(),
+                    new URL('../assets/env/negx.jpg', import.meta.url).toString(),
+                    new URL('../assets/env/posy.jpg', import.meta.url).toString(),
+                    new URL('../assets/env/negy.jpg', import.meta.url).toString(),
+                    new URL('../assets/env/posz.jpg', import.meta.url).toString(),
+                    new URL('../assets/env/negz.jpg', import.meta.url).toString(),
                 ],
             }, () => resolve())
         })
