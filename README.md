@@ -8,3 +8,6 @@ TBD
 
 ### Features
 - TBD
+
+### Credits
+- Ice crack sound is a snippet from [JustinBW](https://freesound.org/people/JustinBW/sounds/70110/)

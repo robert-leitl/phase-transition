@@ -10,9 +10,9 @@ const isDev = import.meta.env.MODE === 'development';
 let sketch;
 let pane;
 
-//if (isDev) {
+if (isDev) {
     import('https://greggman.github.io/webgl-lint/webgl-lint.js');
-//}
+}
 
 if (hasDebugParam || isDev) {
     pane = new Pane({ title: 'Settings', expanded: isDev });

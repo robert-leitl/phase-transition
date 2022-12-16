@@ -219,8 +219,8 @@ void main() {
     float n0 = fbm(dir, 0.7);
     float n1 = fbm(dir, 0.6);
 
-    vec4[2] voronoi0 = voronoi(dir * 2.5 * (1. - n0 * 0.12));
-    vec4[2] voronoi1 = voronoi(dir * 2.5 * (1. - n1 * 0.2));
+    vec4[2] voronoi0 = voronoi(dir * 2. * (1. - n0 * 0.12));
+    vec4[2] voronoi1 = voronoi(dir * 2. * (1. - n1 * 0.2));
     vec4[2] voronoi2 = voronoi(dir * 1.5 * (1. - n1 * 0.3));
     vec4[2] voronoi3 = voronoi(dir * 3.0 * (1. - n1 * 0.4));
     vec4 v0 = voronoi0[0];

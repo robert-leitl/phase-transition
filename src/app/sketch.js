@@ -50,8 +50,19 @@ export class Sketch {
         }
     };
 
+    animationProps = {
+        p: 0, // progress
+        w: 0, // wobble strength
+        p0: 0, // prev progress
+        w: 0, // prev wobble strength
+        wm: 0,
+        s: 1, // scale
+        sa: 0, // additional scale (for freezing)
+        sm: 0, // scale momentum
+        cracked: false
+    };
+
     settings = {
-        progress: 0
     }
     
     constructor(canvasElm, onInit = null, isDev = false, pane = null) {
@@ -194,6 +205,10 @@ export class Sketch {
         );
         this.blurTexture = this.blurFBO.attachments[0];
 
+        
+        ///// INIT AUDIO FX
+        this.crackSound = new Audio(new URL('../assets/crack.mp3', import.meta.url));
+
         this.worldMatrix = mat4.create();
         this.worldInverseMatrix = mat4.create();
         this.worldInverseTransposeMatrix = mat4.create();
@@ -256,25 +271,72 @@ export class Sketch {
     #initTweakpane() {
         if (!this.pane) return;
 
-        this.animationFolder = this.pane.addFolder({ title: 'Animation', expanded: true });
+        /*this.animationFolder = this.pane.addFolder({ title: 'Animation', expanded: true });
         this.animationFolder.addInput(
             this.settings, 
             'progress',
             { label: 'progress', min: 0, max: 1 }
-        );
+        );*/
     }
 
     #animate(deltaTime) {
         /** @type {WebGLRenderingContext} */
         const gl = this.gl;
 
-        // use a fixed deltaTime of 10 ms adapted to
+        // use a fixed deltaTime of 16 ms adapted to
         // device frame rate
         deltaTime = 16 * this.#deltaFrames;
 
-        this.progress += (this.isPointerDown ? -1 : 2) * deltaTime * 0.00025;
-        this.progress = Math.min(1.5, Math.max(0, this.progress));
-        this.settings.progress = Math.min(1, Math.max(0, this.progress));
+        this.animationProps.p0 = this.animationProps.p;
+        let st = 1;
+        let d1 = 50;
+        let d2 = 0.92;
+        let dw = 1;
+        if (this.isPointerDown) {
+            this.animationProps.p -= 1 * deltaTime * 0.00025;
+            st = .9;
+            d1 = 30;
+            d2 = 0.92
+        } else {
+            this.animationProps.p += 2 * deltaTime * 0.00025;
+            st = 1.05;
+            d1 = 10;
+            d2 = 0.5
+            dw = 1;
+        }
+
+        // wobble scale
+        const ds = (this.animationProps.s - st);
+        this.animationProps.sm -= ds / d1;
+        this.animationProps.sm *= d2;
+        this.animationProps.s += this.animationProps.sm;
+        this.animationProps.w = 0;
+
+        if (this.animationProps.p0 < this.animationProps.p) {
+            this.dir = 1;
+        } else {
+            this.dir = -1;
+        }
+
+        if (this.dir === 1 && this.animationProps.p > 0.7 && this.animationProps.p < 0.9) {
+            this.animationProps.sa = Math.random() * 0.03;
+        } else {
+            this.animationProps.sa = 0;
+        }
+
+        this.animationProps.p = Math.min(14.5, this.animationProps.p);
+        this.animationProps.p = Math.min(1, Math.max(0, this.animationProps.p));
+        this.animationProps.w = 1 - this.animationProps.p;
+
+
+        if (this.dir === 1 && !this.animationProps.cracked && this.animationProps.p >= 0.77) {
+            this.crackSound.play();
+            this.animationProps.cracked = true;
+        }
+
+        if (this.dir === -1 && this.animationProps.p < 0.85) {
+            this.animationProps.cracked = false;
+        }
     }
 
     #render() {
@@ -297,7 +359,7 @@ export class Sketch {
             twgl.drawBufferInfo(gl, this.quadBufferInfo);
         }
 
-        const p = this.settings.progress;
+        const p = this.animationProps.p;
         twgl.bindFramebufferInfo(gl, this.drawFBO );
         this.gl.clearColor(0, 0, 0, 1);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
@@ -314,9 +376,11 @@ export class Sketch {
             u_iceNormal: this.iceNormalTexture,
             u_dirtTexture: this.dirtTexture,
             u_envMapTexture: this.envMapTexture,
+            u_wobbleStrength: this.animationProps.w,
+            u_scale: this.animationProps.s + this.animationProps.sa,
             u_progress1: 1 - Math.pow((1-p), 5),
             u_progress2: easeInOutCubic(p),
-            u_progress3: easeInOutExpo(Math.max(0, (p - 0.5) * 2))
+            u_progress3: easeInOutExpo(Math.max(0, (p - 0.8) * (1 / (1 - 0.8))))
         });
         gl.bindVertexArray(this.modelVAO);
         gl.enable(gl.CULL_FACE);
