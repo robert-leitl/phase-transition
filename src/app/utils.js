@@ -24,3 +24,7 @@ export const easeInExpo = (x) => {
 export const easeOutQuint = (x) => {
     return 1 - Math.pow(1 - x, 5);
 }
+
+export const easeOutExpo = (x) => {
+    return x === 1 ? 1 : 1 - Math.pow(2, -10 * x);
+}

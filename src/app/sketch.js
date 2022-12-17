@@ -16,7 +16,9 @@ import blurVert from './shader/blur.vert.glsl';
 import blurFrag from './shader/blur.frag.glsl';
 import compositeVert from './shader/composite.vert.glsl';
 import compositeFrag from './shader/composite.frag.glsl';
-import { easeInOutCubic, easeInOutExpo } from "./utils";
+import particleVert from './shader/particle.vert.glsl';
+import particleFrag from './shader/particle.frag.glsl';
+import { easeInOutCubic, easeInOutExpo, easeOutExpo } from "./utils";
 
 export class Sketch {
 
@@ -59,11 +61,15 @@ export class Sketch {
         s: 1, // scale
         sa: 0, // additional scale (for freezing)
         sm: 0, // scale momentum
-        cracked: false
+        cracked: false,
+        particleTime: 0,
+        particleStart: false,
     };
 
     settings = {
     }
+
+    PARTICLE_COUNT = 2000;
     
     constructor(canvasElm, onInit = null, isDev = false, pane = null) {
         this.canvas = canvasElm;
@@ -147,6 +153,7 @@ export class Sketch {
         );
 
         await this.#initImageTextures();
+        this.#initParticles();
 
         // Setup Programs
         this.colorPrg = twgl.createProgramInfo(gl, [colorVert, colorFrag]);
@@ -155,15 +162,17 @@ export class Sketch {
         this.highpassPrg = twgl.createProgramInfo(gl, [highpassVert, highpassFrag]);
         this.blurPrg = twgl.createProgramInfo(gl, [blurVert, blurFrag]);
         this.compositePrg = twgl.createProgramInfo(gl, [compositeVert, compositeFrag]);
+        this.particlePrg = twgl.createProgramInfo(gl, [particleVert, particleFrag]);
 
         // Setup Meshes
         this.quadBufferInfo = twgl.createBufferInfoFromArrays(gl, { a_position: { numComponents: 2, data: [-1, -1, 3, -1, -1, 3] }});
         this.quadVAO = twgl.createVAOAndSetAttributes(gl, this.texturePrg.attribSetters, this.quadBufferInfo.attribs, this.quadBufferInfo.indices);
+        this.particleBufferInfo = twgl.createBufferInfoFromArrays(gl, { a_position: { numComponents: 3, data: this.particlePositions }});
+        this.particleVAO = twgl.createVAOAndSetAttributes(gl, this.particlePrg.attribSetters, this.particleBufferInfo.attribs);
 
         // load the bead model
         this.glbBuilder = new GLBBuilder(gl);
         await this.glbBuilder.load(new URL('../assets/model.glb', import.meta.url));
-        console.log(this.glbBuilder);
         this.modelPrimitive = this.glbBuilder.getPrimitiveDataByMeshName('Icosphere');
         this.modelBuffers = this.modelPrimitive.buffers;
         this.modelBufferInfo = twgl.createBufferInfoFromArrays(gl, { 
@@ -177,7 +186,6 @@ export class Sketch {
 
         // Setup Framebuffers
         const resScale = Math.max(this.viewportSize[0], this.viewportSize[1]) > 800 ? 1 : 0.5;
-        console.log(resScale);
         this.textureFBO = twgl.createFramebufferInfo(
             gl, 
             [{attachmentPoint: gl.COLOR_ATTACHMENT0}, {attachmentPoint: gl.COLOR_ATTACHMENT1}], 
@@ -279,6 +287,21 @@ export class Sketch {
         );*/
     }
 
+    #initParticles() {
+
+        this.particlePositions = new Float32Array(this.PARTICLE_COUNT * 3);
+
+        for(let i=0; i<this.PARTICLE_COUNT; ++i) {
+            const r = 1.0 + Math.random() * 0.2
+            const polar = Math.random() * Math.PI * 2;
+            const alpha = Math.random() * Math.PI * 2;
+            this.particlePositions[i * 3 + 0] = r * Math.sin(polar) * Math.cos(alpha);
+            this.particlePositions[i * 3 + 1] = r * Math.sin(polar) * Math.sin(alpha);
+            this.particlePositions[i * 3 + 2] = r * Math.cos(polar);
+        }
+
+    }
+
     #animate(deltaTime) {
         /** @type {WebGLRenderingContext} */
         const gl = this.gl;
@@ -327,15 +350,22 @@ export class Sketch {
         this.animationProps.p = Math.min(14.5, this.animationProps.p);
         this.animationProps.p = Math.min(1, Math.max(0, this.animationProps.p));
         this.animationProps.w = 1 - this.animationProps.p;
-
+        this.animationProps.particleTime -= 0.002;
+        this.animationProps.particleTime = Math.max(0, this.animationProps.particleTime);
 
         if (this.dir === 1 && !this.animationProps.cracked && this.animationProps.p >= 0.77) {
             this.crackSound.play();
             this.animationProps.cracked = true;
         }
 
+        if (this.dir === 1 && !this.animationProps.particleStart && this.animationProps.p >= 0.9) {
+            this.animationProps.particleStart = true;
+            this.animationProps.particleTime = 1.;
+        }
+
         if (this.dir === -1 && this.animationProps.p < 0.85) {
             this.animationProps.cracked = false;
+            this.animationProps.particleStart = false;
         }
     }
 
@@ -391,6 +421,25 @@ export class Sketch {
             gl.UNSIGNED_SHORT,
             0
         );
+        // draw particles
+        this.gl.useProgram(this.particlePrg.program);
+        twgl.setUniforms(this.particlePrg, {
+            u_worldMatrix: this.worldMatrix,
+            u_viewMatrix: this.camera.matrices.view,
+            u_projectionMatrix: this.camera.matrices.projection,
+            u_time: easeOutExpo(1 - this.animationProps.particleTime)
+        });
+        gl.disable(gl.CULL_FACE);
+        gl.disable(gl.DEPTH_TEST);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.bindVertexArray(this.particleVAO);
+        gl.drawArrays(
+            gl.POINTS,
+            0,
+            this.particleBufferInfo.numElements
+        );
+        gl.disable(gl.BLEND);
 
         // get highpass
         twgl.bindFramebufferInfo(gl, this.highpassFBO);

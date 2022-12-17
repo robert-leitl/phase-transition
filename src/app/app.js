@@ -15,7 +15,7 @@ if (isDev) {
 }
 
 if (hasDebugParam || isDev) {
-    pane = new Pane({ title: 'Settings', expanded: isDev });
+    //pane = new Pane({ title: 'Settings', expanded: isDev });
 }
 
 const resize = () => {
