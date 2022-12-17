@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "vite serve",
-    "build": "vite build --emptyOutDir --base=/frost/dist/",
+    "build": "vite build --emptyOutDir --base=/phase-transition/dist/",
     "preview": "vite preview"
   },
   "devDependencies": {

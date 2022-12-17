@@ -1,10 +1,10 @@
-# Frost
+# Phase Transition
 
-![Frost Screenshot](https://github.com/robert-leitl/frost/blob/main/cover.jpg?raw=true)
+![phase-transition Screenshot](https://github.com/robert-leitl/phase-transition/blob/main/cover.jpg?raw=true)
 
 TBD
 
-[DEMO](https://robert-leitl.github.io/frost/dist/?debug=true)
+[DEMO](https://robert-leitl.github.io/frost/phase-transition/?debug=true)
 
 ### Features
 - TBD
