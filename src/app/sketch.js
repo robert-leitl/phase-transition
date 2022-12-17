@@ -63,13 +63,14 @@ export class Sketch {
         sm: 0, // scale momentum
         cracked: false,
         particleTime: 0,
+        particleEaseTime: 0,
         particleStart: false,
     };
 
     settings = {
     }
 
-    PARTICLE_COUNT = 2000;
+    PARTICLE_COUNT = 1000;
     
     constructor(canvasElm, onInit = null, isDev = false, pane = null) {
         this.canvas = canvasElm;
@@ -167,8 +168,18 @@ export class Sketch {
         // Setup Meshes
         this.quadBufferInfo = twgl.createBufferInfoFromArrays(gl, { a_position: { numComponents: 2, data: [-1, -1, 3, -1, -1, 3] }});
         this.quadVAO = twgl.createVAOAndSetAttributes(gl, this.texturePrg.attribSetters, this.quadBufferInfo.attribs, this.quadBufferInfo.indices);
-        this.particleBufferInfo = twgl.createBufferInfoFromArrays(gl, { a_position: { numComponents: 3, data: this.particlePositions }});
-        this.particleVAO = twgl.createVAOAndSetAttributes(gl, this.particlePrg.attribSetters, this.particleBufferInfo.attribs);
+        this.particleBufferInfo = twgl.createBufferInfoFromArrays(gl, { 
+            a_position: { 
+                numComponents: 2, 
+                data: [0, 0, 0.1, -0.1, 0, 0.05],
+            },
+            a_instanceMatrix: {
+                numComponents: 16,
+                data: this.particleInstanceMatricesData,
+                divisor: 1,
+            }
+        });
+        this.particleVAO = twgl.createVAOAndSetAttributes(gl, this.particlePrg.attribSetters, this.particleBufferInfo.attribs, this.particleBufferInfo.indices);
 
         // load the bead model
         this.glbBuilder = new GLBBuilder(gl);
@@ -288,18 +299,27 @@ export class Sketch {
     }
 
     #initParticles() {
-
-        this.particlePositions = new Float32Array(this.PARTICLE_COUNT * 3);
-
-        for(let i=0; i<this.PARTICLE_COUNT; ++i) {
+        this.particleInstanceMatricesData = new Float32Array(this.PARTICLE_COUNT * 16);
+        this.initParticlePositions = [];
+        this.initParticleScales = [];
+        this.initParticleRotations = [];
+        this.particleInstanceMatrices = [];
+        for (let i = 0; i < this.PARTICLE_COUNT; ++i) {
             const r = 1.0 + Math.random() * 0.2
             const polar = Math.random() * Math.PI * 2;
             const alpha = Math.random() * Math.PI * 2;
-            this.particlePositions[i * 3 + 0] = r * Math.sin(polar) * Math.cos(alpha);
-            this.particlePositions[i * 3 + 1] = r * Math.sin(polar) * Math.sin(alpha);
-            this.particlePositions[i * 3 + 2] = r * Math.cos(polar);
-        }
+            const x = r * Math.sin(polar) * Math.cos(alpha);
+            const y = r * Math.sin(polar) * Math.sin(alpha);
+            const z = r * Math.cos(polar);
 
+            const mat = new Float32Array(this.particleInstanceMatricesData.buffer, i * 16 * 4, 16);
+            mat4.identity(mat);
+
+            this.particleInstanceMatrices.push(mat);
+            this.initParticlePositions.push([x, y, z]);
+            this.initParticleScales.push([Math.random() * 0.2 + 0.1, Math.random() * 0.2 + 0.1, Math.random() * 0.2 + 0.1]);
+            this.initParticleRotations.push([Math.PI * 2 * Math.random(), Math.PI * 2 * Math.random(), 0]);
+        }
     }
 
     #animate(deltaTime) {
@@ -350,7 +370,7 @@ export class Sketch {
         this.animationProps.p = Math.min(14.5, this.animationProps.p);
         this.animationProps.p = Math.min(1, Math.max(0, this.animationProps.p));
         this.animationProps.w = 1 - this.animationProps.p;
-        this.animationProps.particleTime -= 0.002;
+        this.animationProps.particleTime -= 0.0007;
         this.animationProps.particleTime = Math.max(0, this.animationProps.particleTime);
 
         if (this.dir === 1 && !this.animationProps.cracked && this.animationProps.p >= 0.77) {
@@ -367,6 +387,39 @@ export class Sketch {
             this.animationProps.cracked = false;
             this.animationProps.particleStart = false;
         }
+
+        //this.animationProps.particleTime = 1.;
+        this.animationProps.particleEaseTime = easeOutExpo(1 - this.animationProps.particleTime);
+
+        let offsetScale = this.animationProps.particleEaseTime * 0.5;
+        let scale = 1 - this.animationProps.particleEaseTime;
+        scale *= 0.7
+        offsetScale -= 0.05;
+        const offset = vec3.create();
+        for (let i = 0; i < this.PARTICLE_COUNT; ++i) {
+            const mat = this.particleInstanceMatrices[i];
+            const pos = this.initParticlePositions[i];
+            const initScale = this.initParticleScales[i];
+            const initRot = this.initParticleRotations[i];
+            initRot[0] = initRot[0] + 0.01;
+            initRot[1] = initRot[1] + 0.005;
+            vec3.copy(offset, pos);
+            vec3.scale(offset, offset, offsetScale);
+
+            mat4.identity(mat);
+            mat4.translate(mat, mat, pos);
+            mat4.translate(mat, mat, offset);
+            mat4.rotateY(mat, mat, initRot[0]);
+            mat4.rotateZ(mat, mat, initRot[1]);
+            mat4.scale(mat, mat, initScale);
+            mat4.scale(mat, mat, [scale, scale, scale]);
+
+            this.particleInstanceMatrices.push(mat);
+        }
+        // upload the instance matrix buffer
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.particleBufferInfo.attribs.a_instanceMatrix.buffer);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.particleInstanceMatricesData);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
     }
 
     #render() {
@@ -427,18 +480,13 @@ export class Sketch {
             u_worldMatrix: this.worldMatrix,
             u_viewMatrix: this.camera.matrices.view,
             u_projectionMatrix: this.camera.matrices.projection,
-            u_time: easeOutExpo(1 - this.animationProps.particleTime)
+            u_time: this.animationProps.particleEaseTime
         });
-        gl.disable(gl.CULL_FACE);
-        gl.disable(gl.DEPTH_TEST);
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.bindVertexArray(this.particleVAO);
-        gl.drawArrays(
-            gl.POINTS,
-            0,
-            this.particleBufferInfo.numElements
-        );
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_COLOR, gl.ONE_MINUS_DST_ALPHA);
+        gl.drawArraysInstanced(gl.TRIANGLES, 0, this.particleBufferInfo.numElements, this.PARTICLE_COUNT);
+
         gl.disable(gl.BLEND);
 
         // get highpass
