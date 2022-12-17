@@ -4,7 +4,7 @@
 
 TBD
 
-[DEMO](https://robert-leitl.github.io/frost/phase-transition/?debug=true)
+[DEMO](https://robert-leitl.github.io/phase-transition/phase-transition/?debug=true)
 
 ### Features
 - TBD
