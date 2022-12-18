@@ -535,14 +535,14 @@ export class Sketch {
     }
 
     #updateCameraMatrix() {
-        mat4.targetTo(this.camera.matrix, this.camera.position, [0, 0, 0], this.camera.up);
+        mat4.targetTo(this.camera.matrix, this.camera.position, [0.1, -0.07, 0], this.camera.up);
         mat4.invert(this.camera.matrices.view, this.camera.matrix);
     }
 
     #updateProjectionMatrix(gl) {
         this.camera.aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
 
-        const height = 1.3;
+        const height = 1.45;
         const distance = this.camera.position[2];
         if (this.camera.aspect > 1) {
             this.camera.fov = 2 * Math.atan( height / distance );
