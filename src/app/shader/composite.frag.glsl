@@ -27,7 +27,7 @@ void main() {
     vec4 bloom = texture(u_bloomTexture, v_uv);
     vec4 stain = texture(u_stainTexture, v_uv);
 
-    vec3 comp = blendScreen(color.rgb, bloom.rgb, 0.5);
+    vec3 comp = blendScreen(color.rgb, bloom.rgb, 0.4);
 
     outColor = vec4(comp, 0.);
 }

@@ -393,7 +393,7 @@ export class Sketch {
 
         let offsetScale = this.animationProps.particleEaseTime * 0.5;
         let scale = 1 - this.animationProps.particleEaseTime;
-        scale *= 0.7
+        scale *= .7
         offsetScale -= 0.05;
         const offset = vec3.create();
         for (let i = 0; i < this.PARTICLE_COUNT; ++i) {
@@ -523,12 +523,12 @@ export class Sketch {
         if (this.isDev) {
             // draw helper view of particle texture
             /*twgl.bindFramebufferInfo(gl, null);
-            gl.viewport(0, 0, this.viewportSize[0] / 2, this.viewportSize[1] / 4);
+            gl.viewport(0, 0, this.viewportSize[0] / 4, this.viewportSize[1] / 4);
             gl.bindVertexArray(this.quadVAO);
             gl.disable(gl.DEPTH_TEST);
             gl.useProgram(this.testPrg.program);
             twgl.setUniforms(this.testPrg, { 
-                u_texture: this.iceNormalTexture
+                u_texture: this.blurTexture
             });
             twgl.drawBufferInfo(gl, this.quadBufferInfo);*/
         }
