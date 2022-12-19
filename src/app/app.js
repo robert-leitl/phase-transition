@@ -36,5 +36,15 @@ fromEvent(window, 'load').pipe(take(1)).subscribe(() => resize());
 
 // INIT APP
 const canvasElm = document.querySelector('canvas');
-sketch = new Sketch(canvasElm, (instance) => instance.run(), isDev, pane);
-//resize();
+const startButton = document.querySelector('#start-button');
+const intro = document.querySelector('#intro');
+
+sketch = new Sketch(canvasElm, (instance) => {
+    startButton.style.opacity = 1;
+    document.body.removeChild(document.body.querySelector('#loader'));
+    fromEvent(startButton, 'click').pipe(take(1)).subscribe(() => {
+        intro.style.display = 'none';
+        startButton.style.display = 'none';
+        instance.run();
+    });
+}, isDev, pane);

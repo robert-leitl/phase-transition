@@ -535,7 +535,7 @@ export class Sketch {
     }
 
     #updateCameraMatrix() {
-        mat4.targetTo(this.camera.matrix, this.camera.position, [0.1, -0.07, 0], this.camera.up);
+        mat4.targetTo(this.camera.matrix, this.camera.position, [0, 0, 0], this.camera.up);
         mat4.invert(this.camera.matrices.view, this.camera.matrix);
     }
 

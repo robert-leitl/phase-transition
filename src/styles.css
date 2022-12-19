@@ -14,6 +14,8 @@ html, body {
     overflow: hidden;
     touch-action: none;
     background-color: black;
+    --center-offset: 2em;
+    color: #eee;
 }
 
 body {
@@ -39,6 +41,7 @@ canvas {
     font-size: 0.8em;
 }
 
+#start-button,
 .loader,
 .loader:after {
   --track-color: rgba(134, 134, 134, 0.3);
@@ -48,41 +51,79 @@ canvas {
   font-size: 10px;
   margin: 0;
   padding: 0;
-  border: 2px solid #fff;
+  border: 2px solid var(--track-color);
 }
 
+#start-button,
 .loader {
-    display: none;
   position: absolute;
-  top: calc(50% - 5em);
+  top: calc(50% - 5em - var(--center-offset));
   left: calc(50% - 5em);
 }
 
 .loader {
-    border-left: 2px solid #727272;
-    -webkit-transform: translateZ(0);
-    -ms-transform: translateZ(0);
-    transform: translateZ(0);
-    -webkit-animation: load8 1.1s infinite linear;
-    animation: load8 1.1s infinite linear;
+  border-left: 2px solid #727272;
+  -webkit-transform: translateZ(0);
+  -ms-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-animation: load8 1.1s infinite linear;
+  animation: load8 1.1s infinite linear;
+}
+@-webkit-keyframes load8 {
+  0% {
+    -webkit-transform: rotate(0deg);
+    transform: rotate(0deg);
   }
-  @-webkit-keyframes load8 {
-    0% {
-      -webkit-transform: rotate(0deg);
-      transform: rotate(0deg);
-    }
-    100% {
-      -webkit-transform: rotate(360deg);
-      transform: rotate(360deg);
-    }
+  100% {
+    -webkit-transform: rotate(360deg);
+    transform: rotate(360deg);
   }
-  @keyframes load8 {
-    0% {
-      -webkit-transform: rotate(0deg);
-      transform: rotate(0deg);
-    }
-    100% {
-      -webkit-transform: rotate(360deg);
-      transform: rotate(360deg);
-    }
+}
+@keyframes load8 {
+  0% {
+    -webkit-transform: rotate(0deg);
+    transform: rotate(0deg);
   }
+  100% {
+    -webkit-transform: rotate(360deg);
+    transform: rotate(360deg);
+  }
+}
+
+#start-button {
+  border-color: #aaa;
+  background: black;
+  color: #eee;
+  background: #eee;
+  color: #333;
+  border: none;
+  font-weight: bold;
+  text-transform: uppercase;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 400ms;
+  cursor: pointer;
+}
+
+#start-button label {
+  pointer-events: none;
+  font-size: 1.5em;
+  letter-spacing: 0.15em;
+}
+
+#intro {
+  font-family: Lucida Sans Typewriter,Lucida Console,monaco,Bitstream Vera Sans Mono,monospace;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  position: absolute;
+  top: calc(50% + 5em - var(--center-offset));
+}
+
+#intro p {
+  font-size: .8em;
+  max-width: 24em;
+  line-height: 1.4em;
+}
